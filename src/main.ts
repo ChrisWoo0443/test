@@ -9,6 +9,8 @@ import {
 import type { EvenHubEvent } from '@evenrealities/even_hub_sdk'
 
 // ─── Types ────────────────────────────────────────────────────
+// NOW_PLAYING and PLAYLISTS are the two top-level tabs.
+// TRACKS is a drill-down from PLAYLISTS.
 type Screen = 'AUTH' | 'NOW_PLAYING' | 'PLAYLISTS' | 'TRACKS'
 
 interface SpotifyPlaylist {
@@ -48,7 +50,7 @@ let isLoading = false
 
 const CONTAINER_ID = 1
 const CONTAINER_NAME = 'spotify'
-const MAX_LIST_ROWS = 7
+const MAX_LIST_ROWS = 6  // one row reserved for tab bar
 
 // ─── API helper ───────────────────────────────────────────────
 async function api<T = unknown>(
@@ -72,15 +74,19 @@ function trunc(str: string, len: number): string {
   return str.length > len ? str.slice(0, len - 1) + '…' : str
 }
 
-function buildScrollList(
-  title: string,
-  items: string[],
-  selectedIdx: number,
-  hint: string
-): string {
+// Tab bar shown at the top of every main screen
+function tabBar(): string {
+  const nowActive  = currentScreen === 'NOW_PLAYING'
+  const listActive = currentScreen === 'PLAYLISTS' || currentScreen === 'TRACKS'
+  const nowLabel  = nowActive  ? '[♪ Now Playing]' : '  Now Playing '
+  const listLabel = listActive ? '[≡ Playlists]  ' : '  Playlists   '
+  return `${nowLabel}  ${listLabel}`
+}
+
+function buildScrollList(items: string[], selectedIdx: number, hint: string): string {
   const start = Math.max(0, Math.min(selectedIdx, items.length - MAX_LIST_ROWS))
   const visible = items.slice(start, start + MAX_LIST_ROWS)
-  const lines = [title, '─'.repeat(22)]
+  const lines: string[] = []
 
   visible.forEach((item, i) => {
     const marker = start + i === selectedIdx ? '▶ ' : '  '
@@ -110,51 +116,60 @@ function screenContent(): string {
       ].join('\n')
 
     case 'NOW_PLAYING': {
-      if (isLoading) return '♪ Spotify G2\n\nConnecting...'
+      const header = [tabBar(), '─'.repeat(30)]
+
+      if (isLoading) return [...header, '', 'Connecting…'].join('\n')
+
       if (!playback?.item) {
         return [
-          '♪ Spotify G2',
-          '─'.repeat(22),
+          ...header,
           'Nothing playing.',
           '',
-          'Start Spotify on your device,',
+          'Start Spotify on a device,',
           'then tap to refresh.',
           '',
-          'Tap → Browse playlists',
+          'D-Tap → switch to Playlists',
         ].join('\n')
       }
+
       const { item, is_playing } = playback
       return [
-        '♪ Now Playing',
-        '─'.repeat(22),
+        ...header,
         trunc(item.name, 28),
         trunc(item.artists.map((a) => a.name).join(', '), 28),
         '',
         is_playing ? '▶ Playing' : '⏸ Paused',
         '',
-        'Tap→Playlists  D-Tap→Play/Pause',
-        '↑ Prev  ↓ Next',
+        'Tap=Play/Pause  ↑Prev  ↓Next',
+        'D-Tap → Playlists tab',
       ].join('\n')
     }
 
-    case 'PLAYLISTS':
-      if (playlists.length === 0) return 'Playlists\n─'.repeat(22) + '\nLoading…'
-      return buildScrollList(
-        'Playlists',
-        playlists.map((p) => p.name),
-        playlistIndex,
-        'Tap→Open  D-Tap→Back  ↑↓ Move'
-      )
+    case 'PLAYLISTS': {
+      const header = [tabBar(), '─'.repeat(30)]
+      if (playlists.length === 0) return [...header, '', 'Loading…'].join('\n')
+      return [
+        ...header,
+        buildScrollList(
+          playlists.map((p) => p.name),
+          playlistIndex,
+          'Tap=Open  D-Tap→Now Playing  ↑↓'
+        ),
+      ].join('\n')
+    }
 
     case 'TRACKS': {
-      const title = selectedPlaylist ? trunc(selectedPlaylist.name, 20) : 'Tracks'
-      if (tracks.length === 0) return `${title}\n\nLoading…`
-      return buildScrollList(
-        title,
-        tracks.map((t) => t.name),
-        trackIndex,
-        'Tap→Play  D-Tap→Back  ↑↓ Move'
-      )
+      const title = selectedPlaylist ? trunc(selectedPlaylist.name, 22) : 'Tracks'
+      const header = [`← ${title}`, '─'.repeat(30)]
+      if (tracks.length === 0) return [...header, '', 'Loading…'].join('\n')
+      return [
+        ...header,
+        buildScrollList(
+          tracks.map((t) => t.name),
+          trackIndex,
+          'Tap=Play  D-Tap=Back  ↑↓ Move'
+        ),
+      ].join('\n')
     }
   }
 }
@@ -206,6 +221,8 @@ async function loadTracks(playlistId: string): Promise<void> {
 }
 
 // ─── Event handlers ───────────────────────────────────────────
+
+// TAP: auth-refresh | play-pause | open-playlist | play-track
 async function handleTap(): Promise<void> {
   switch (currentScreen) {
     case 'AUTH': {
@@ -222,10 +239,14 @@ async function handleTap(): Promise<void> {
     }
 
     case 'NOW_PLAYING':
-      currentScreen = 'PLAYLISTS'
-      playlistIndex = 0
-      await render()
-      if (playlists.length === 0) loadPlaylists()
+      try {
+        if (playback?.is_playing) {
+          await api('/api/player/pause', 'POST')
+        } else {
+          await api('/api/player/play', 'POST')
+        }
+        setTimeout(refreshPlayback, 400)
+      } catch { /* no active device */ }
       break
 
     case 'PLAYLISTS':
@@ -245,9 +266,7 @@ async function handleTap(): Promise<void> {
           context_uri: `spotify:playlist:${selectedPlaylist.id}`,
           offset: { uri: tracks[trackIndex].uri },
         })
-      } catch {
-        // device may not be active — still navigate back
-      }
+      } catch { /* no active device — still navigate */ }
       currentScreen = 'NOW_PLAYING'
       await render()
       setTimeout(refreshPlayback, 600)
@@ -255,19 +274,13 @@ async function handleTap(): Promise<void> {
   }
 }
 
+// D-TAP: switch tabs (top level) | go back (TRACKS)
 async function handleDoubleTap(): Promise<void> {
   switch (currentScreen) {
     case 'NOW_PLAYING':
-      try {
-        if (playback?.is_playing) {
-          await api('/api/player/pause', 'POST')
-        } else {
-          await api('/api/player/play', 'POST')
-        }
-        setTimeout(refreshPlayback, 400)
-      } catch {
-        /* no active device */
-      }
+      currentScreen = 'PLAYLISTS'
+      if (playlists.length === 0) loadPlaylists()
+      await render()
       break
 
     case 'PLAYLISTS':
@@ -282,6 +295,7 @@ async function handleDoubleTap(): Promise<void> {
   }
 }
 
+// SCROLL UP: prev track | scroll list up
 async function handleScrollUp(): Promise<void> {
   switch (currentScreen) {
     case 'NOW_PLAYING':
@@ -303,6 +317,7 @@ async function handleScrollUp(): Promise<void> {
   }
 }
 
+// SCROLL DOWN: next track | scroll list down
 async function handleScrollDown(): Promise<void> {
   switch (currentScreen) {
     case 'NOW_PLAYING':
@@ -370,7 +385,6 @@ async function main(): Promise<void> {
     onEvent(event)
   })
 
-  // Check Spotify auth before first render
   try {
     const status = await api<{ authenticated: boolean }>('/auth/status')
     if (!status?.authenticated) currentScreen = 'AUTH'
@@ -378,7 +392,7 @@ async function main(): Promise<void> {
     currentScreen = 'AUTH'
   }
 
-  // Initial page — must call createStartUpPageContainer exactly once
+  // createStartUpPageContainer must be called exactly once
   await bridge.createStartUpPageContainer(
     new CreateStartUpPageContainer({
       containerTotalNum: 1,
@@ -393,7 +407,7 @@ async function main(): Promise<void> {
           height: 248,
           borderWidth: 2,
           borderColor: 10,
-          borderRdaius: '5',   // SDK typo — must use this spelling
+          borderRdaius: '5',   // SDK typo — must match exactly
           paddingLength: 12,
           isEventCapture: 1,
         }),
@@ -401,12 +415,11 @@ async function main(): Promise<void> {
     })
   )
 
-  // If already authenticated, load current playback
   if (currentScreen === 'NOW_PLAYING') {
     await refreshPlayback()
   }
 
-  // Keep Now Playing screen current while the user is on it
+  // Keep Now Playing current while active
   setInterval(() => {
     if (currentScreen === 'NOW_PLAYING') refreshPlayback()
   }, 5_000)
