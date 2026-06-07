@@ -47,6 +47,8 @@ let playback: PlaybackState | null = null
 
 let scrollCooldown = false
 let isLoading = false
+// 0 = previous  1 = play/pause  2 = next
+let controlIndex = 1
 
 const CONTAINER_ID = 1
 const CONTAINER_NAME = 'spotify'
@@ -128,19 +130,24 @@ function screenContent(): string {
           'Start Spotify on a device,',
           'then tap to refresh.',
           '',
-          'D-Tap → switch to Playlists',
+          'D-Tap → Playlists tab',
         ].join('\n')
       }
 
       const { item, is_playing } = playback
+      const btnLabels = ['<<', is_playing ? '||' : '>', '>>']
+      const btnRow = btnLabels
+        .map((lbl, i) => (i === controlIndex ? `[ ${lbl} ]` : `  ${lbl}  `))
+        .join('')
+
       return [
         ...header,
         trunc(item.name, 28),
         trunc(item.artists.map((a) => a.name).join(', '), 28),
         '',
-        is_playing ? '▶ Playing' : '⏸ Paused',
+        btnRow,
         '',
-        'Tap=Play/Pause  ↑Prev  ↓Next',
+        '↑↓ cycle  Tap=execute',
         'D-Tap → Playlists tab',
       ].join('\n')
     }
@@ -240,12 +247,20 @@ async function handleTap(): Promise<void> {
 
     case 'NOW_PLAYING':
       try {
-        if (playback?.is_playing) {
-          await api('/api/player/pause', 'POST')
+        if (controlIndex === 0) {
+          await api('/api/player/previous', 'POST')
+          setTimeout(refreshPlayback, 600)
+        } else if (controlIndex === 1) {
+          if (playback?.is_playing) {
+            await api('/api/player/pause', 'POST')
+          } else {
+            await api('/api/player/play', 'POST')
+          }
+          setTimeout(refreshPlayback, 400)
         } else {
-          await api('/api/player/play', 'POST')
+          await api('/api/player/next', 'POST')
+          setTimeout(refreshPlayback, 600)
         }
-        setTimeout(refreshPlayback, 400)
       } catch { /* no active device */ }
       break
 
@@ -295,14 +310,12 @@ async function handleDoubleTap(): Promise<void> {
   }
 }
 
-// SCROLL UP: prev track | scroll list up
+// SCROLL UP: cycle control left | scroll list up
 async function handleScrollUp(): Promise<void> {
   switch (currentScreen) {
     case 'NOW_PLAYING':
-      try {
-        await api('/api/player/previous', 'POST')
-        setTimeout(refreshPlayback, 600)
-      } catch { /* ignore */ }
+      controlIndex = (controlIndex - 1 + 3) % 3
+      await render()
       break
 
     case 'PLAYLISTS':
@@ -317,14 +330,12 @@ async function handleScrollUp(): Promise<void> {
   }
 }
 
-// SCROLL DOWN: next track | scroll list down
+// SCROLL DOWN: cycle control right | scroll list down
 async function handleScrollDown(): Promise<void> {
   switch (currentScreen) {
     case 'NOW_PLAYING':
-      try {
-        await api('/api/player/next', 'POST')
-        setTimeout(refreshPlayback, 600)
-      } catch { /* ignore */ }
+      controlIndex = (controlIndex + 1) % 3
+      await render()
       break
 
     case 'PLAYLISTS':
