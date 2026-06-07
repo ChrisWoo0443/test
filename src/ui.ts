@@ -1,6 +1,12 @@
 // Companion web UI — runs in the Even Hub WebView alongside the glasses bridge
 
 // ── Types ──────────────────────────────────────────────────────
+interface SetupStatus {
+  hasCredentials: boolean
+  authenticated: boolean
+  redirectUri: string
+}
+
 interface PlaybackState {
   is_playing: boolean
   progress_ms?: number
@@ -9,9 +15,7 @@ interface PlaybackState {
     uri: string
     duration_ms: number
     artists: { name: string }[]
-    album: {
-      images: { url: string; width: number }[]
-    }
+    album: { images: { url: string; width: number }[] }
   }
 }
 
@@ -62,9 +66,109 @@ function el<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T
 }
 
-function showView(id: 'view-auth' | 'view-main' | 'view-tracks') {
+type ViewId = 'view-step1' | 'view-step2' | 'view-step3' | 'view-main' | 'view-tracks'
+function showView(id: ViewId) {
   document.querySelectorAll<HTMLElement>('.view').forEach((v) => v.classList.remove('active'))
   el(id).classList.add('active')
+}
+
+// ── Wizard — Step 1 ───────────────────────────────────────────
+function initStep1(redirectUri: string) {
+  // Fill in the actual redirect URI from server config
+  el('redirect-uri-display').textContent = redirectUri
+
+  el('btn-copy-uri').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(redirectUri)
+      const btn = el('btn-copy-uri')
+      btn.textContent = 'Copied!'
+      btn.classList.add('copied')
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied') }, 2000)
+    } catch { /* clipboard not available in all WebViews */ }
+  })
+
+  el('btn-step1-next').addEventListener('click', () => showView('view-step2'))
+}
+
+// ── Wizard — Step 2 ───────────────────────────────────────────
+function initStep2() {
+  const btnSave  = el<HTMLButtonElement>('btn-save-creds')
+  const errBox   = el('creds-error')
+  const idInput  = el<HTMLInputElement>('input-client-id')
+  const secInput = el<HTMLInputElement>('input-client-secret')
+
+  btnSave.addEventListener('click', async () => {
+    const clientId     = idInput.value.trim()
+    const clientSecret = secInput.value.trim()
+
+    errBox.classList.remove('visible')
+    idInput.classList.remove('error')
+    secInput.classList.remove('error')
+
+    if (!clientId)     { idInput.classList.add('error');  return }
+    if (!clientSecret) { secInput.classList.add('error'); return }
+
+    btnSave.disabled = true
+    el('btn-save-label').textContent = 'Verifying…'
+
+    try {
+      const result = await api<{ ok?: boolean; error?: string }>(
+        '/setup/credentials',
+        'POST',
+        { clientId, clientSecret }
+      )
+
+      if (result?.ok) {
+        showView('view-step3')
+      } else {
+        showError(result?.error ?? 'Something went wrong.')
+      }
+    } catch {
+      showError('Could not reach the server. Is it running?')
+    } finally {
+      btnSave.disabled = false
+      el('btn-save-label').textContent = 'Continue'
+    }
+  })
+
+  function showError(msg: string) {
+    errBox.textContent = msg
+    errBox.classList.add('visible')
+  }
+}
+
+// ── Wizard — Step 3 ───────────────────────────────────────────
+function initStep3() {
+  el('btn-check-auth').addEventListener('click', async () => {
+    try {
+      const status = await api<{ authenticated: boolean }>('/auth/status')
+      if (status?.authenticated) {
+        await launchMain()
+      } else {
+        // Flash the button to prompt them to authorize first
+        const btn = el('btn-check-auth')
+        btn.textContent = 'Not authorized yet — tap "Authorize with Spotify" first'
+        setTimeout(() => { btn.textContent = 'I\'ve authorized — continue' }, 3000)
+      }
+    } catch {
+      /* ignore */
+    }
+  })
+}
+
+// ── Main view ─────────────────────────────────────────────────
+async function launchMain() {
+  showView('view-main')
+  initControls()
+  await Promise.all([
+    pollPlayback(),
+    api<{ items: Playlist[] }>('/api/playlists')
+      .then((data) => { playlists = data?.items ?? []; renderPlaylists() })
+      .catch(() => {
+        el('playlist-list').innerHTML = '<div class="placeholder-msg">Could not load playlists.</div>'
+      }),
+  ])
+  setInterval(pollPlayback, 5_000)
 }
 
 // ── Now Playing ────────────────────────────────────────────────
@@ -86,7 +190,6 @@ function startProgressTimer(playing: boolean) {
 
 function renderPlayback() {
   const hasTrack = !!playback?.item
-
   ;(el<HTMLButtonElement>('btn-play')).disabled = !hasTrack
   ;(el<HTMLButtonElement>('btn-prev')).disabled = !hasTrack
   ;(el<HTMLButtonElement>('btn-next')).disabled = !hasTrack
@@ -104,15 +207,11 @@ function renderPlayback() {
   }
 
   const { item, is_playing, progress_ms = 0 } = playback!
-
   el('track-name').textContent = item!.name
   el('artist-name').textContent = item!.artists.map((a) => a.name).join(', ')
-
-  // Play / Pause icon
-  el('icon-play').style.display = is_playing ? 'none' : ''
+  el('icon-play').style.display  = is_playing ? 'none' : ''
   el('icon-pause').style.display = is_playing ? '' : 'none'
 
-  // Album art — only swap DOM if URL changed
   const imgUrl = item!.album.images[0]?.url ?? ''
   if (imgUrl !== currentAlbumUrl) {
     currentAlbumUrl = imgUrl
@@ -120,7 +219,7 @@ function renderPlayback() {
     const placeholder = el('album-placeholder')
     if (imgUrl) {
       img.src = imgUrl
-      img.onload = () => { img.classList.add('loaded'); placeholder.style.display = 'none' }
+      img.onload  = () => { img.classList.add('loaded'); placeholder.style.display = 'none' }
       img.onerror = () => { img.classList.remove('loaded'); placeholder.style.display = '' }
     } else {
       img.classList.remove('loaded')
@@ -128,10 +227,9 @@ function renderPlayback() {
     }
   }
 
-  // Progress
   localProgress = progress_ms
   localDuration = item!.duration_ms || 1
-  // Disable CSS transition for large jumps (track change / seek)
+  // Skip CSS transition when jumping (track change / first load)
   const fill = el('progress-fill')
   fill.style.transition = 'none'
   updateProgressDisplay()
@@ -144,27 +242,22 @@ function renderPlayback() {
 function renderPlaylists() {
   const list = el('playlist-list')
   list.innerHTML = ''
-
   if (playlists.length === 0) {
     list.innerHTML = '<div class="placeholder-msg">No playlists found.</div>'
     return
   }
-
   playlists.forEach((pl) => {
     const item = document.createElement('div')
     item.className = 'playlist-item'
-
     const thumbHtml = pl.images[0]?.url
       ? `<div class="pl-thumb"><img src="${pl.images[0].url}" alt="" loading="lazy" /></div>`
       : `<div class="pl-thumb">♪</div>`
-
     item.innerHTML = `
       ${thumbHtml}
       <div class="pl-info">
         <div class="pl-name">${pl.name}</div>
         <div class="pl-meta">${pl.tracks.total} songs</div>
-      </div>
-    `
+      </div>`
     item.addEventListener('click', () => openPlaylist(pl))
     list.appendChild(item)
   })
@@ -176,14 +269,11 @@ async function openPlaylist(pl: Playlist) {
   el('tracks-title').textContent = pl.name
   el('track-list').innerHTML = '<div class="placeholder-msg">Loading…</div>'
   showView('view-tracks')
-
   try {
     const data = await api<{ items: { track: Track | null }[] }>(
       `/api/playlists/${pl.id}/tracks`
     )
-    tracks = (data?.items ?? [])
-      .filter((i) => i.track !== null)
-      .map((i) => i.track as Track)
+    tracks = (data?.items ?? []).filter((i) => i.track !== null).map((i) => i.track as Track)
     renderTracks()
   } catch {
     el('track-list').innerHTML = '<div class="placeholder-msg">Failed to load tracks.</div>'
@@ -193,9 +283,7 @@ async function openPlaylist(pl: Playlist) {
 function renderTracks() {
   const list = el('track-list')
   list.innerHTML = ''
-
   const currentUri = playback?.item?.uri
-
   tracks.forEach((track, i) => {
     const playing = track.uri === currentUri
     const item = document.createElement('div')
@@ -206,8 +294,7 @@ function renderTracks() {
         <div class="track-item-name">${track.name}</div>
         <div class="track-item-artist">${track.artists.map((a) => a.name).join(', ')}</div>
       </div>
-      ${track.duration_ms ? `<div class="track-dur">${ms(track.duration_ms)}</div>` : ''}
-    `
+      ${track.duration_ms ? `<div class="track-dur">${ms(track.duration_ms)}</div>` : ''}`
     item.addEventListener('click', () => playTrack(track))
     list.appendChild(item)
   })
@@ -220,7 +307,7 @@ async function playTrack(track: Track) {
       context_uri: `spotify:playlist:${selectedPlaylist.id}`,
       offset: { uri: track.uri },
     })
-  } catch { /* fall through — navigate back regardless */ }
+  } catch { /* navigate back regardless */ }
   showView('view-main')
   setTimeout(pollPlayback, 700)
 }
@@ -237,53 +324,48 @@ async function pollPlayback() {
 function initControls() {
   el('btn-play').addEventListener('click', async () => {
     try {
-      if (playback?.is_playing) {
-        await api('/api/player/pause', 'POST')
-      } else {
-        await api('/api/player/play', 'POST')
-      }
+      if (playback?.is_playing) await api('/api/player/pause', 'POST')
+      else                      await api('/api/player/play',  'POST')
       setTimeout(pollPlayback, 400)
     } catch { /* ignore */ }
   })
-
   el('btn-prev').addEventListener('click', async () => {
     try { await api('/api/player/previous', 'POST') } catch { /* ignore */ }
     setTimeout(pollPlayback, 600)
   })
-
   el('btn-next').addEventListener('click', async () => {
     try { await api('/api/player/next', 'POST') } catch { /* ignore */ }
     setTimeout(pollPlayback, 600)
   })
-
   el('btn-back').addEventListener('click', () => showView('view-main'))
 }
 
 // ── Init ────────────────────────────────────────────────────────
 async function init() {
   try {
-    const status = await api<{ authenticated: boolean }>('/auth/status')
-    if (!status?.authenticated) { showView('view-auth'); return }
+    const status = await api<SetupStatus>('/setup/status')
+
+    // Populate redirect URI in step 1 from server config
+    initStep1(status?.redirectUri ?? 'http://localhost:3001/auth/callback')
+    initStep2()
+    initStep3()
+
+    if (status?.authenticated) {
+      await launchMain()
+    } else if (status?.hasCredentials) {
+      // Have credentials but not yet authorized
+      showView('view-step3')
+    } else {
+      // Fresh install — start at step 1
+      showView('view-step1')
+    }
   } catch {
-    showView('view-auth')
-    return
+    // Server not reachable — show step 1 and let user proceed
+    initStep1('http://localhost:3001/auth/callback')
+    initStep2()
+    initStep3()
+    showView('view-step1')
   }
-
-  showView('view-main')
-  initControls()
-
-  // Fetch playback + playlists in parallel
-  await Promise.all([
-    pollPlayback(),
-    api<{ items: Playlist[] }>('/api/playlists')
-      .then((data) => { playlists = data?.items ?? []; renderPlaylists() })
-      .catch(() => {
-        el('playlist-list').innerHTML = '<div class="placeholder-msg">Could not load playlists.</div>'
-      }),
-  ])
-
-  // Keep playback state fresh
-  setInterval(pollPlayback, 5_000)
 }
 
 init()

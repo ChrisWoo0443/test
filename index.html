@@ -21,55 +21,278 @@
     .view { display: none; flex-direction: column; min-height: 100dvh; }
     .view.active { display: flex; }
 
-    /* ── Auth ─────────────────────────────────────────── */
-    .auth-screen {
+    /* ── Shared wizard / form styles ───────────────────────── */
+    .wizard-wrap {
       flex: 1;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 24px;
-      padding: 40px 32px;
-      text-align: center;
+      padding: 40px 28px 48px;
+      gap: 0;
+      overflow-y: auto;
     }
 
-    .auth-logo {
-      width: 88px;
-      height: 88px;
-      background: #1db954;
+    .wizard-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .wizard-logo svg { width: 22px; height: 22px; fill: #1db954; }
+
+    /* Step indicator */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      margin-bottom: 36px;
+    }
+    .step-dot {
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+      flex-shrink: 0;
+      background: #282828;
+      color: #535353;
+      transition: background 0.3s, color 0.3s;
     }
+    .step-dot.active { background: #1db954; color: #000; }
+    .step-dot.done   { background: #1db95433; color: #1db954; }
+    .step-line {
+      flex: 1;
+      height: 2px;
+      background: #282828;
+      transition: background 0.3s;
+    }
+    .step-line.done { background: #1db95433; }
 
-    .auth-title { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-
-    .auth-sub {
-      font-size: 15px;
+    .wizard-heading {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      margin-bottom: 8px;
+    }
+    .wizard-sub {
+      font-size: 14px;
       color: #b3b3b3;
       line-height: 1.6;
-      max-width: 280px;
+      margin-bottom: 28px;
     }
 
-    .btn-connect {
+    /* Instruction list */
+    .instr-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .instr-item {
+      display: flex;
+      gap: 14px;
+      align-items: flex-start;
+    }
+    .instr-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #282828;
+      color: #b3b3b3;
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+    .instr-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #e0e0e0;
+    }
+    .instr-text strong { color: #fff; }
+
+    /* Code / copy block */
+    .code-block {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      background: #000;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 8px 0 4px;
+    }
+    .code-text {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      color: #1db954;
+      word-break: break-all;
+    }
+    .btn-copy {
+      background: #282828;
+      border: none;
+      color: #b3b3b3;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-copy:hover  { background: #333; color: #fff; }
+    .btn-copy.copied { background: #1db95433; color: #1db954; }
+
+    /* External link button */
+    .btn-link {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 6px;
+      background: #282828;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 12px 20px;
+      border-radius: 8px;
+      text-decoration: none;
+      margin-bottom: 24px;
+      transition: background 0.15s;
+    }
+    .btn-link:hover  { background: #333; }
+    .btn-link:active { background: #3a3a3a; }
+    .btn-link svg { width: 16px; height: 16px; fill: currentColor; }
+
+    /* Form fields */
+    .field-group {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      margin-bottom: 28px;
+    }
+    .field label {
+      display: block;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #b3b3b3;
+      margin-bottom: 8px;
+    }
+    .field input {
+      width: 100%;
+      background: #282828;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      color: #fff;
+      font-size: 14px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input:focus { border-color: #1db954; }
+    .field input::placeholder { color: #535353; }
+    .field input.error { border-color: #e34 !important; }
+
+    .field-hint {
+      font-size: 12px;
+      color: #b3b3b3;
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    /* Error message */
+    .error-msg {
+      display: none;
+      background: #3a1010;
+      border: 1px solid #e34;
+      border-radius: 6px;
+      color: #ff6b6b;
+      font-size: 13px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+    .error-msg.visible { display: block; }
+
+    /* Primary action button */
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
       background: #1db954;
       color: #000;
       font-size: 15px;
       font-weight: 700;
-      padding: 14px 36px;
+      padding: 15px;
+      border: none;
       border-radius: 50px;
-      text-decoration: none;
-      letter-spacing: 0.3px;
-      margin-top: 8px;
-      transition: background 0.15s, transform 0.1s;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: background 0.15s, transform 0.1s, opacity 0.15s;
     }
-    .btn-connect:active { background: #1ed760; transform: scale(0.97); }
+    .btn-primary:hover  { background: #1ed760; }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    /* ── Header ───────────────────────────────────────── */
+    /* Authorize step */
+    .authorize-card {
+      background: #181818;
+      border-radius: 12px;
+      padding: 28px 24px;
+      text-align: center;
+      margin-bottom: 28px;
+    }
+    .authorize-icon { font-size: 48px; margin-bottom: 16px; }
+    .authorize-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+    .authorize-card p { font-size: 14px; color: #b3b3b3; line-height: 1.6; }
+
+    .btn-authorize {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      background: #1db954;
+      color: #000;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 15px;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      letter-spacing: 0.2px;
+      transition: background 0.15s, transform 0.1s;
+      text-decoration: none;
+      margin-bottom: 16px;
+    }
+    .btn-authorize:hover  { background: #1ed760; }
+    .btn-authorize:active { transform: scale(0.98); }
+
+    .btn-check {
+      width: 100%;
+      background: #282828;
+      border: none;
+      color: #b3b3b3;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 13px;
+      border-radius: 50px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-check:hover { background: #333; color: #fff; }
+
+    /* ── App header ─────────────────────────────────────────── */
     .app-header {
       display: flex;
       align-items: center;
@@ -81,7 +304,6 @@
       background: #121212;
       z-index: 10;
     }
-
     .header-logo {
       display: flex;
       align-items: center;
@@ -99,15 +321,10 @@
       font-weight: 600;
       color: #b3b3b3;
     }
-    .conn-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #535353;
-    }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #535353; }
     .conn-dot.on { background: #1db954; box-shadow: 0 0 6px #1db954aa; }
 
-    /* ── Now Playing ──────────────────────────────────── */
+    /* ── Now Playing ────────────────────────────────────────── */
     .now-playing {
       padding: 28px 24px 20px;
       display: flex;
@@ -130,78 +347,47 @@
       position: relative;
     }
     .album-art img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: none;
-      position: absolute;
-      inset: 0;
+      width: 100%; height: 100%; object-fit: cover;
+      display: none; position: absolute; inset: 0;
     }
     .album-art img.loaded { display: block; }
-    .album-placeholder { font-size: 72px; opacity: 0.25; }
+    .album-placeholder { font-size: 72px; opacity: 0.2; }
 
     .track-info { width: 100%; text-align: center; }
     .track-name {
-      font-size: 19px;
-      font-weight: 700;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 19px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       letter-spacing: -0.2px;
     }
     .artist-name {
-      font-size: 14px;
-      color: #b3b3b3;
-      margin-top: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 14px; color: #b3b3b3; margin-top: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
-    /* Progress */
     .progress-wrap { width: 100%; }
     .progress-bar {
-      width: 100%;
-      height: 4px;
-      background: #535353;
-      border-radius: 2px;
-      overflow: hidden;
-      cursor: pointer;
+      width: 100%; height: 4px; background: #535353;
+      border-radius: 2px; overflow: hidden; cursor: pointer;
     }
     .progress-fill {
-      height: 100%;
-      background: #b3b3b3;
-      border-radius: 2px;
-      width: 0%;
-      transition: width 1s linear;
+      height: 100%; background: #b3b3b3; border-radius: 2px;
+      width: 0%; transition: width 1s linear;
     }
     .progress-bar:hover .progress-fill { background: #1db954; }
     .progress-times {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 6px;
-      font-size: 11px;
-      color: #b3b3b3;
+      display: flex; justify-content: space-between;
+      margin-top: 6px; font-size: 11px; color: #b3b3b3;
       font-variant-numeric: tabular-nums;
     }
 
-    /* Controls */
     .controls {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 28px;
+      display: flex; align-items: center;
+      justify-content: center; gap: 28px;
     }
     .ctrl-btn {
-      background: none;
-      border: none;
-      color: #b3b3b3;
-      cursor: pointer;
-      padding: 8px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: none; border: none; color: #b3b3b3; cursor: pointer;
+      padding: 8px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
       transition: color 0.15s, transform 0.1s;
     }
     .ctrl-btn:hover { color: #fff; }
@@ -211,123 +397,73 @@
     .ctrl-btn svg { width: 26px; height: 26px; fill: currentColor; }
 
     .ctrl-btn--play {
-      width: 56px;
-      height: 56px;
-      background: #fff;
-      color: #000;
-      border-radius: 50%;
-      padding: 0;
+      width: 56px; height: 56px;
+      background: #fff; color: #000; border-radius: 50%; padding: 0;
     }
     .ctrl-btn--play:hover { background: #fff; color: #000; transform: scale(1.05); }
     .ctrl-btn--play:active { transform: scale(0.95); }
     .ctrl-btn--play:disabled { background: #535353; }
     .ctrl-btn--play svg { width: 22px; height: 22px; }
 
-    /* ── Playlists ─────────────────────────────────────── */
+    /* ── Playlists ───────────────────────────────────────────── */
     .section-title {
       padding: 4px 20px 12px;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      color: #b3b3b3;
-      text-transform: uppercase;
+      font-size: 11px; font-weight: 700;
+      letter-spacing: 1.5px; color: #b3b3b3; text-transform: uppercase;
     }
-
-    .playlist-list {
-      padding: 0 12px 32px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+    .playlist-list { padding: 0 12px 32px; display: flex; flex-direction: column; gap: 2px; }
 
     .playlist-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 8px;
-      border-radius: 6px;
-      cursor: pointer;
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px; border-radius: 6px; cursor: pointer;
       transition: background 0.1s;
     }
     .playlist-item:hover  { background: #282828; }
     .playlist-item:active { background: #333; }
 
     .pl-thumb {
-      width: 48px;
-      height: 48px;
-      border-radius: 4px;
-      background: #333;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      color: #666;
-      overflow: hidden;
+      width: 48px; height: 48px; border-radius: 4px;
+      background: #333; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; color: #666; overflow: hidden;
     }
     .pl-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
     .pl-info { flex: 1; overflow: hidden; }
     .pl-name {
-      font-size: 15px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 15px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .pl-meta { font-size: 13px; color: #b3b3b3; margin-top: 2px; }
 
-    /* ── Tracks view ──────────────────────────────────── */
+    /* ── Tracks view ─────────────────────────────────────────── */
     .tracks-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 14px 16px;
-      border-bottom: 1px solid #2a2a2a;
-      position: sticky;
-      top: 0;
-      background: #121212;
-      z-index: 10;
+      display: flex; align-items: center; gap: 8px;
+      padding: 14px 16px; border-bottom: 1px solid #2a2a2a;
+      position: sticky; top: 0; background: #121212; z-index: 10;
     }
-
     .btn-back {
-      background: none;
-      border: none;
-      color: #b3b3b3;
-      cursor: pointer;
+      background: none; border: none; color: #b3b3b3; cursor: pointer;
       padding: 4px 8px 4px 0;
-      display: flex;
-      align-items: center;
-      flex-shrink: 0;
+      display: flex; align-items: center; flex-shrink: 0;
       transition: color 0.15s;
     }
     .btn-back:hover { color: #fff; }
     .btn-back svg { width: 22px; height: 22px; fill: currentColor; display: block; }
 
     .tracks-title {
-      font-size: 16px;
-      font-weight: 700;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 16px; font-weight: 700;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
 
     .track-list {
       padding: 8px 12px 32px;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      overflow-y: auto;
-      flex: 1;
+      display: flex; flex-direction: column; gap: 2px;
+      overflow-y: auto; flex: 1;
     }
-
     .track-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 8px;
-      border-radius: 6px;
-      cursor: pointer;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 8px; border-radius: 6px; cursor: pointer;
       transition: background 0.1s;
     }
     .track-item:hover  { background: #282828; }
@@ -335,91 +471,193 @@
     .track-item.playing .track-item-name { color: #1db954; }
 
     .track-num {
-      width: 28px;
-      text-align: center;
-      font-size: 13px;
-      color: #b3b3b3;
-      flex-shrink: 0;
+      width: 28px; text-align: center;
+      font-size: 13px; color: #b3b3b3; flex-shrink: 0;
     }
     .track-item.playing .track-num { color: #1db954; }
 
     .track-item-info { flex: 1; overflow: hidden; }
     .track-item-name {
-      font-size: 15px;
-      font-weight: 500;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 15px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .track-item-artist {
-      font-size: 13px;
-      color: #b3b3b3;
-      margin-top: 2px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-size: 13px; color: #b3b3b3; margin-top: 2px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .track-dur { font-size: 13px; color: #b3b3b3; flex-shrink: 0; }
 
-    /* ── Utility ──────────────────────────────────────── */
     .placeholder-msg {
-      text-align: center;
-      color: #b3b3b3;
-      font-size: 14px;
-      padding: 32px 20px;
+      text-align: center; color: #b3b3b3;
+      font-size: 14px; padding: 32px 20px;
     }
   </style>
 </head>
 <body>
 <div id="app">
 
-  <!-- ── Auth view ── -->
-  <div class="view" id="view-auth">
-    <div class="auth-screen">
-      <div class="auth-logo">
-        <svg viewBox="0 0 24 24" width="44" height="44" fill="#000">
-          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-        </svg>
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STEP 1 — Create Spotify App                           -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="view" id="view-step1">
+    <div class="wizard-wrap">
+      <div class="wizard-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        Spotify G2
       </div>
-      <h1 class="auth-title">Spotify G2</h1>
-      <p class="auth-sub">Connect your Spotify account to control music on your Even Realities G2 glasses.</p>
-      <a href="/auth/login" class="btn-connect">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-        </svg>
-        Connect Spotify
+
+      <div class="step-indicator">
+        <div class="step-dot active" id="s1-d1">1</div>
+        <div class="step-line" id="s1-l1"></div>
+        <div class="step-dot" id="s1-d2">2</div>
+        <div class="step-line" id="s1-l2"></div>
+        <div class="step-dot" id="s1-d3">3</div>
+      </div>
+
+      <h2 class="wizard-heading">Create a Spotify App</h2>
+      <p class="wizard-sub">You need a free Spotify Developer app to connect. This takes about 2 minutes.</p>
+
+      <a class="btn-link" href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+        Open Spotify Dashboard
       </a>
+
+      <div class="instr-list">
+        <div class="instr-item">
+          <div class="instr-num">1</div>
+          <div class="instr-text">Sign in and click <strong>Create App</strong></div>
+        </div>
+        <div class="instr-item">
+          <div class="instr-num">2</div>
+          <div class="instr-text">Give it any name — e.g. <strong>My G2 Music</strong></div>
+        </div>
+        <div class="instr-item">
+          <div class="instr-num">3</div>
+          <div class="instr-text">
+            Under <strong>Redirect URIs</strong>, add exactly:
+            <div class="code-block">
+              <span class="code-text" id="redirect-uri-display">http://localhost:3001/auth/callback</span>
+              <button class="btn-copy" id="btn-copy-uri">Copy</button>
+            </div>
+          </div>
+        </div>
+        <div class="instr-item">
+          <div class="instr-num">4</div>
+          <div class="instr-text">Check <strong>Web API</strong> under APIs used</div>
+        </div>
+        <div class="instr-item">
+          <div class="instr-num">5</div>
+          <div class="instr-text">Click <strong>Save</strong></div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-step1-next">
+        I've created my app
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+      </button>
     </div>
   </div>
 
-  <!-- ── Main view ── -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STEP 2 — Enter Credentials                            -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="view" id="view-step2">
+    <div class="wizard-wrap">
+      <div class="wizard-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        Spotify G2
+      </div>
+
+      <div class="step-indicator">
+        <div class="step-dot done" id="s2-d1">✓</div>
+        <div class="step-line done" id="s2-l1"></div>
+        <div class="step-dot active" id="s2-d2">2</div>
+        <div class="step-line" id="s2-l2"></div>
+        <div class="step-dot" id="s2-d3">3</div>
+      </div>
+
+      <h2 class="wizard-heading">Enter Your Credentials</h2>
+      <p class="wizard-sub">On your Spotify app's page, find your Client ID and Client Secret.</p>
+
+      <div class="error-msg" id="creds-error"></div>
+
+      <div class="field-group">
+        <div class="field">
+          <label for="input-client-id">Client ID</label>
+          <input type="text" id="input-client-id" placeholder="Paste your Client ID" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="field">
+          <label for="input-client-secret">Client Secret</label>
+          <input type="password" id="input-client-secret" placeholder="Paste your Client Secret" autocomplete="off" spellcheck="false" />
+          <div class="field-hint">Click <strong style="color:#fff">"View client secret"</strong> on the Spotify dashboard to reveal it.</div>
+        </div>
+      </div>
+
+      <button class="btn-primary" id="btn-save-creds">
+        <span id="btn-save-label">Continue</span>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STEP 3 — Authorize                                    -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div class="view" id="view-step3">
+    <div class="wizard-wrap">
+      <div class="wizard-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        Spotify G2
+      </div>
+
+      <div class="step-indicator">
+        <div class="step-dot done">✓</div>
+        <div class="step-line done"></div>
+        <div class="step-dot done">✓</div>
+        <div class="step-line done"></div>
+        <div class="step-dot active">3</div>
+      </div>
+
+      <div class="authorize-card">
+        <div class="authorize-icon">🎵</div>
+        <h3>One last step</h3>
+        <p>Tap below to log in with Spotify and allow access to your music. This opens in your browser.</p>
+      </div>
+
+      <a class="btn-authorize" href="/auth/login" target="_blank" rel="noopener" id="btn-authorize">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        Authorize with Spotify
+      </a>
+
+      <button class="btn-check" id="btn-check-auth">I've authorized — continue</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- MAIN VIEW                                             -->
+  <!-- ══════════════════════════════════════════════════════ -->
   <div class="view" id="view-main">
     <header class="app-header">
       <div class="header-logo">
-        <svg viewBox="0 0 24 24">
-          <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
-        </svg>
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
         Spotify G2
       </div>
       <div class="conn-badge">
-        <div class="conn-dot on" id="conn-dot"></div>
-        <span id="conn-label">Connected</span>
+        <div class="conn-dot on"></div>
+        <span>Connected</span>
       </div>
     </header>
 
     <div style="overflow-y:auto; flex:1;">
-      <!-- Now Playing card -->
       <section class="now-playing">
         <div class="album-art" id="album-art">
           <img id="album-img" src="" alt="Album art" />
           <div class="album-placeholder" id="album-placeholder">♪</div>
         </div>
-
         <div class="track-info">
           <div class="track-name" id="track-name">—</div>
           <div class="artist-name" id="artist-name">—</div>
         </div>
-
         <div class="progress-wrap">
           <div class="progress-bar">
             <div class="progress-fill" id="progress-fill"></div>
@@ -429,31 +667,20 @@
             <span id="progress-total">0:00</span>
           </div>
         </div>
-
         <div class="controls">
-          <!-- Previous -->
           <button class="ctrl-btn" id="btn-prev" aria-label="Previous" disabled>
             <svg viewBox="0 0 16 16"><path d="M13 2.5L5 7.119V2.5H3v11h2V8.881l8 4.619V2.5z"/></svg>
           </button>
-
-          <!-- Play / Pause -->
           <button class="ctrl-btn ctrl-btn--play" id="btn-play" aria-label="Play / Pause" disabled>
-            <svg id="icon-play" viewBox="0 0 16 16">
-              <path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/>
-            </svg>
-            <svg id="icon-pause" viewBox="0 0 16 16" style="display:none">
-              <path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/>
-            </svg>
+            <svg id="icon-play" viewBox="0 0 16 16"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 16 16" style="display:none"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>
           </button>
-
-          <!-- Next -->
           <button class="ctrl-btn" id="btn-next" aria-label="Next" disabled>
             <svg viewBox="0 0 16 16"><path d="M3 13.5l8-4.619V13.5h2v-11h-2v4.619L3 2.5v11z"/></svg>
           </button>
         </div>
       </section>
 
-      <!-- Playlists -->
       <div class="section-title">My Playlists</div>
       <div class="playlist-list" id="playlist-list">
         <div class="placeholder-msg">Loading playlists…</div>
@@ -461,7 +688,9 @@
     </div>
   </div>
 
-  <!-- ── Tracks view ── -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- TRACKS VIEW                                           -->
+  <!-- ══════════════════════════════════════════════════════ -->
   <div class="view" id="view-tracks">
     <div class="tracks-header">
       <button class="btn-back" id="btn-back" aria-label="Back">
@@ -474,9 +703,7 @@
 
 </div>
 
-<!-- Glasses bridge (invisible) -->
 <script type="module" src="/src/main.ts"></script>
-<!-- Companion web UI -->
 <script type="module" src="/src/ui.ts"></script>
 </body>
 </html>
