@@ -1,5 +1,5 @@
 {
-  "package_id": "com.spotify.g2",
+  "package_id": "com.chriswoo.spotifyg2",
   "name": "Spotify G2",
   "version": "1.0.0",
   "description": "Spotify controller for Even Realities G2 — browse playlists, pick tracks, control playback",

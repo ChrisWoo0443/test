@@ -166,6 +166,15 @@ async function ensureToken(): Promise<string> {
   return accessToken
 }
 
+// Distinguish "not logged in" from real server errors so the
+// frontend can route back to the setup wizard on 401
+function errStatus(err: unknown): number {
+  const msg = String(err)
+  if (msg.includes('Not authenticated') || msg.includes('Credentials not configured')) return 401
+  if (msg.includes('Spotify 401')) return 401
+  return 500
+}
+
 // ─── Spotify API helper ───────────────────────────────────────
 async function spotifyRequest(method: string, path: string, body?: object): Promise<unknown> {
   const token = await ensureToken()
@@ -189,43 +198,70 @@ async function spotifyRequest(method: string, path: string, body?: object): Prom
 // ─── Player routes ────────────────────────────────────────────
 app.get('/api/player', async (_req, res) => {
   try { res.json(await spotifyRequest('GET', '/me/player')) }
-  catch (err) { res.status(500).json({ error: String(err) }) }
+  catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 app.post('/api/player/play', async (req, res) => {
   try { await spotifyRequest('PUT', '/me/player/play', req.body ?? {}); res.json({ ok: true }) }
-  catch (err) { res.status(500).json({ error: String(err) }) }
+  catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 app.post('/api/player/pause', async (_req, res) => {
   try { await spotifyRequest('PUT', '/me/player/pause'); res.json({ ok: true }) }
-  catch (err) { res.status(500).json({ error: String(err) }) }
+  catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 app.post('/api/player/next', async (_req, res) => {
   try { await spotifyRequest('POST', '/me/player/next'); res.json({ ok: true }) }
-  catch (err) { res.status(500).json({ error: String(err) }) }
+  catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 app.post('/api/player/previous', async (_req, res) => {
   try { await spotifyRequest('POST', '/me/player/previous'); res.json({ ok: true }) }
-  catch (err) { res.status(500).json({ error: String(err) }) }
+  catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
+})
+
+app.post('/api/player/seek', async (req, res) => {
+  const position = Number(req.query.position_ms)
+  if (!Number.isFinite(position) || position < 0) {
+    res.status(400).json({ error: 'position_ms must be a non-negative number' })
+    return
+  }
+  try {
+    await spotifyRequest('PUT', `/me/player/seek?position_ms=${Math.floor(position)}`)
+    res.json({ ok: true })
+  } catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 // ─── Playlist routes ──────────────────────────────────────────
 app.get('/api/playlists', async (_req, res) => {
   try { res.json(await spotifyRequest('GET', '/me/playlists?limit=50')) }
-  catch (err) { res.status(500).json({ error: String(err) }) }
+  catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 app.get('/api/playlists/:id/tracks', async (req, res) => {
   try {
     const fields = 'items(track(id,name,uri,duration_ms,artists(name))),total'
-    res.json(await spotifyRequest(
+    const MAX_TRACKS = 200
+    type Page = { items: unknown[]; total: number }
+
+    const first = (await spotifyRequest(
       'GET',
       `/playlists/${req.params.id}/tracks?limit=50&fields=${encodeURIComponent(fields)}`
-    ))
-  } catch (err) { res.status(500).json({ error: String(err) }) }
+    )) as Page
+
+    const items = [...first.items]
+    while (items.length < Math.min(first.total, MAX_TRACKS)) {
+      const page = (await spotifyRequest(
+        'GET',
+        `/playlists/${req.params.id}/tracks?limit=50&offset=${items.length}&fields=${encodeURIComponent(fields)}`
+      )) as Page
+      if (!page.items.length) break
+      items.push(...page.items)
+    }
+
+    res.json({ items, total: first.total })
+  } catch (err) { res.status(errStatus(err)).json({ error: String(err) }) }
 })
 
 app.listen(3001, () => {

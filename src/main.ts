@@ -111,10 +111,10 @@ function screenContent(): string {
         '─'.repeat(22),
         'Not connected to Spotify.',
         '',
-        'Open in your browser:',
-        'localhost:3001/auth/login',
+        'Complete setup in the Even',
+        'app on your phone.',
         '',
-        'Then tap to refresh.',
+        'This screen updates itself.',
       ].join('\n')
 
     case 'NOW_PLAYING': {
@@ -418,7 +418,7 @@ async function main(): Promise<void> {
           height: 248,
           borderWidth: 2,
           borderColor: 10,
-          borderRdaius: '5',   // SDK typo — must match exactly
+          borderRdaius: 5,   // property name is misspelled in the SDK — keep as-is
           paddingLength: 12,
           isEventCapture: 1,
         }),
@@ -430,9 +430,21 @@ async function main(): Promise<void> {
     await refreshPlayback()
   }
 
-  // Keep Now Playing current while active
-  setInterval(() => {
-    if (currentScreen === 'NOW_PLAYING') refreshPlayback()
+  // Keep Now Playing current while active; auto-advance once
+  // the user finishes the setup wizard on their phone
+  setInterval(async () => {
+    if (currentScreen === 'NOW_PLAYING') {
+      refreshPlayback()
+    } else if (currentScreen === 'AUTH') {
+      try {
+        const status = await api<{ authenticated: boolean }>('/auth/status')
+        if (status?.authenticated) {
+          currentScreen = 'NOW_PLAYING'
+          await render()
+          refreshPlayback()
+        }
+      } catch { /* server not up yet */ }
+    }
   }, 5_000)
 }
 

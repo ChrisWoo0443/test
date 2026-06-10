@@ -53,13 +53,25 @@ async function api<T>(path: string, method = 'GET', body?: object): Promise<T> {
   })
   if (res.status === 204) return null as T
   const text = await res.text()
-  return text ? JSON.parse(text) : null
+  const data = text ? JSON.parse(text) : null
+  // Setup endpoints return their errors in the body; everything else throws
+  if (!res.ok && !path.startsWith('/setup')) {
+    throw Object.assign(new Error(`API ${res.status}`), { status: res.status })
+  }
+  return data
 }
 
 // ── Helpers ────────────────────────────────────────────────────
 function ms(n: number): string {
   const s = Math.floor(n / 1000)
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+}
+
+// Names from Spotify are user-controlled — escape before innerHTML
+function esc(str: string): string {
+  return str.replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string)
+  )
 }
 
 function el<T extends HTMLElement>(id: string): T {
@@ -185,6 +197,11 @@ function startProgressTimer(playing: boolean) {
   progressTimer = setInterval(() => {
     localProgress = Math.min(localProgress + 1000, localDuration)
     updateProgressDisplay()
+    // Track ended — fetch what's playing now instead of freezing at 100%
+    if (localProgress >= localDuration) {
+      if (progressTimer) clearInterval(progressTimer)
+      setTimeout(pollPlayback, 1200)
+    }
   }, 1000)
 }
 
@@ -250,12 +267,12 @@ function renderPlaylists() {
     const item = document.createElement('div')
     item.className = 'playlist-item'
     const thumbHtml = pl.images[0]?.url
-      ? `<div class="pl-thumb"><img src="${pl.images[0].url}" alt="" loading="lazy" /></div>`
+      ? `<div class="pl-thumb"><img src="${esc(pl.images[0].url)}" alt="" loading="lazy" /></div>`
       : `<div class="pl-thumb">♪</div>`
     item.innerHTML = `
       ${thumbHtml}
       <div class="pl-info">
-        <div class="pl-name">${pl.name}</div>
+        <div class="pl-name">${esc(pl.name)}</div>
         <div class="pl-meta">${pl.tracks.total} songs</div>
       </div>`
     item.addEventListener('click', () => openPlaylist(pl))
@@ -291,8 +308,8 @@ function renderTracks() {
     item.innerHTML = `
       <div class="track-num">${playing ? '♪' : i + 1}</div>
       <div class="track-item-info">
-        <div class="track-item-name">${track.name}</div>
-        <div class="track-item-artist">${track.artists.map((a) => a.name).join(', ')}</div>
+        <div class="track-item-name">${esc(track.name)}</div>
+        <div class="track-item-artist">${esc(track.artists.map((a) => a.name).join(', '))}</div>
       </div>
       ${track.duration_ms ? `<div class="track-dur">${ms(track.duration_ms)}</div>` : ''}`
     item.addEventListener('click', () => playTrack(track))
@@ -317,7 +334,13 @@ async function pollPlayback() {
   try {
     playback = await api<PlaybackState>('/api/player')
     renderPlayback()
-  } catch { /* keep last state */ }
+  } catch (err) {
+    // Server restarted and lost the session — send user to re-authorize
+    if ((err as { status?: number }).status === 401) {
+      showView('view-step3')
+    }
+    /* otherwise keep last state */
+  }
 }
 
 // ── Controls ───────────────────────────────────────────────────
@@ -338,6 +361,19 @@ function initControls() {
     setTimeout(pollPlayback, 600)
   })
   el('btn-back').addEventListener('click', () => showView('view-main'))
+
+  // Click/tap progress bar to seek
+  document.querySelector<HTMLElement>('.progress-bar')?.addEventListener('click', async (e) => {
+    if (!playback?.item) return
+    const bar = e.currentTarget as HTMLElement
+    const rect = bar.getBoundingClientRect()
+    const ratio = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1)
+    const positionMs = Math.floor(ratio * localDuration)
+    localProgress = positionMs
+    updateProgressDisplay()
+    try { await api(`/api/player/seek?position_ms=${positionMs}`, 'POST') } catch { /* ignore */ }
+    setTimeout(pollPlayback, 600)
+  })
 }
 
 // ── Init ────────────────────────────────────────────────────────
