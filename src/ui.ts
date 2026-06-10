@@ -54,9 +54,11 @@ async function api<T>(path: string, method = 'GET', body?: object): Promise<T> {
   if (res.status === 204) return null as T
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
-  // Setup endpoints return their errors in the body; everything else throws
+  // Setup endpoints return errors in the body; all other non-OK responses throw
   if (!res.ok && !path.startsWith('/setup')) {
-    throw Object.assign(new Error(`API ${res.status}`), { status: res.status })
+    // Carry the server's error string so toastFromError can give a useful message
+    const msg = (data as Record<string, string>)?.error ?? `HTTP ${res.status}`
+    throw Object.assign(new Error(msg), { status: res.status })
   }
   return data
 }
@@ -76,6 +78,30 @@ function esc(str: string): string {
 
 function el<T extends HTMLElement>(id: string): T {
   return document.getElementById(id) as T
+}
+
+// ── Toast ──────────────────────────────────────────────────────
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+function showToast(message: string, type: 'error' | 'info' = 'error') {
+  const toast = el('toast')
+  if (toastTimer) clearTimeout(toastTimer)
+  toast.textContent = message
+  toast.className = `toast ${type}`
+  // Force reflow so the transition fires even when re-showing
+  void toast.offsetHeight
+  toast.classList.add('show')
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 4_000)
+}
+
+function toastFromError(err: unknown) {
+  const msg = String((err as Error)?.message ?? err)
+  if (msg.includes('No active device') || msg.includes('404'))
+    showToast('No active Spotify device — open Spotify on a device first.')
+  else if (msg.includes('403') || msg.toLowerCase().includes('premium'))
+    showToast('Spotify Premium is required for playback control.')
+  else if (!msg.includes('401'))  // 401 is handled by redirect, not toast
+    showToast('Command failed — try again.')
 }
 
 type ViewId = 'view-step1' | 'view-step2' | 'view-step3' | 'view-main' | 'view-tracks'
@@ -176,8 +202,9 @@ async function launchMain() {
     pollPlayback(),
     api<{ items: Playlist[] }>('/api/playlists')
       .then((data) => { playlists = data?.items ?? []; renderPlaylists() })
-      .catch(() => {
+      .catch((err) => {
         el('playlist-list').innerHTML = '<div class="placeholder-msg">Could not load playlists.</div>'
+        toastFromError(err)
       }),
   ])
   setInterval(pollPlayback, 5_000)
@@ -292,8 +319,9 @@ async function openPlaylist(pl: Playlist) {
     )
     tracks = (data?.items ?? []).filter((i) => i.track !== null).map((i) => i.track as Track)
     renderTracks()
-  } catch {
+  } catch (err) {
     el('track-list').innerHTML = '<div class="placeholder-msg">Failed to load tracks.</div>'
+    toastFromError(err)
   }
 }
 
@@ -324,7 +352,9 @@ async function playTrack(track: Track) {
       context_uri: `spotify:playlist:${selectedPlaylist.id}`,
       offset: { uri: track.uri },
     })
-  } catch { /* navigate back regardless */ }
+  } catch (err) {
+    toastFromError(err)
+  }
   showView('view-main')
   setTimeout(pollPlayback, 700)
 }
@@ -350,14 +380,16 @@ function initControls() {
       if (playback?.is_playing) await api('/api/player/pause', 'POST')
       else                      await api('/api/player/play',  'POST')
       setTimeout(pollPlayback, 400)
-    } catch { /* ignore */ }
+    } catch (err) { toastFromError(err) }
   })
   el('btn-prev').addEventListener('click', async () => {
-    try { await api('/api/player/previous', 'POST') } catch { /* ignore */ }
+    try { await api('/api/player/previous', 'POST') }
+    catch (err) { toastFromError(err) }
     setTimeout(pollPlayback, 600)
   })
   el('btn-next').addEventListener('click', async () => {
-    try { await api('/api/player/next', 'POST') } catch { /* ignore */ }
+    try { await api('/api/player/next', 'POST') }
+    catch (err) { toastFromError(err) }
     setTimeout(pollPlayback, 600)
   })
   el('btn-back').addEventListener('click', () => showView('view-main'))

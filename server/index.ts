@@ -19,16 +19,58 @@ const CREDS_FILE = join(dirname(fileURLToPath(import.meta.url)), '../spotify-cre
 let clientId = process.env.SPOTIFY_CLIENT_ID ?? ''
 let clientSecret = process.env.SPOTIFY_CLIENT_SECRET ?? ''
 
-try {
-  const saved = JSON.parse(readFileSync(CREDS_FILE, 'utf8')) as Record<string, string>
-  if (!clientId && saved.clientId) clientId = saved.clientId
-  if (!clientSecret && saved.clientSecret) clientSecret = saved.clientSecret
-} catch { /* file doesn't exist yet — that's fine */ }
-
 // ─── In-memory token store (single user) ─────────────────────
 let accessToken: string | null = null
 let refreshToken: string | null = null
 let tokenExpiry = 0
+
+try {
+  const saved = JSON.parse(readFileSync(CREDS_FILE, 'utf8')) as Record<string, string>
+  if (!clientId && saved.clientId) clientId = saved.clientId
+  if (!clientSecret && saved.clientSecret) clientSecret = saved.clientSecret
+  if (saved.refreshToken) refreshToken = saved.refreshToken
+} catch { /* file doesn't exist yet — that's fine */ }
+
+// Merge the current refresh token back into the credentials file.
+// Reads first so clientId/clientSecret are never clobbered.
+function saveTokens(): void {
+  try {
+    let file: Record<string, unknown> = {}
+    try { file = JSON.parse(readFileSync(CREDS_FILE, 'utf8')) } catch { /* new file */ }
+    if (refreshToken) file.refreshToken = refreshToken
+    else delete file.refreshToken
+    writeFileSync(CREDS_FILE, JSON.stringify(file, null, 2))
+  } catch { /* non-fatal */ }
+}
+
+// On startup, try to exchange the saved refresh token for a fresh
+// access token so the user doesn't have to re-authorize after a restart.
+async function tryRestoreSession(): Promise<void> {
+  if (!refreshToken || !clientId || !clientSecret) return
+  try {
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`,
+      },
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: refreshToken }),
+    })
+    if (!response.ok) {
+      refreshToken = null
+      saveTokens()
+      console.log('  Saved session expired — re-authorization required.')
+      return
+    }
+    const data = (await response.json()) as Record<string, unknown>
+    accessToken = data.access_token as string
+    tokenExpiry = Date.now() + (data.expires_in as number) * 1000
+    if (data.refresh_token) { refreshToken = data.refresh_token as string; saveTokens() }
+    console.log('  Session restored from saved refresh token.')
+  } catch {
+    console.log('  Could not reach Spotify on startup — will try again on first request.')
+  }
+}
 
 // ─── Setup routes ─────────────────────────────────────────────
 app.get('/setup/status', (_req, res) => {
@@ -69,6 +111,7 @@ app.post('/setup/credentials', async (req, res) => {
   tokenExpiry = 0
 
   try {
+    // Write only clientId/clientSecret — no leftover refreshToken from a previous account
     writeFileSync(CREDS_FILE, JSON.stringify({ clientId, clientSecret }, null, 2))
   } catch { /* non-fatal if write fails */ }
 
@@ -122,6 +165,7 @@ app.get('/auth/callback', async (req, res) => {
     accessToken  = data.access_token as string
     refreshToken = data.refresh_token as string
     tokenExpiry  = Date.now() + (data.expires_in as number) * 1000
+    saveTokens()
 
     // Close the browser tab and signal the WebView to proceed
     res.send(
@@ -161,6 +205,8 @@ async function ensureToken(): Promise<string> {
     const data = (await response.json()) as Record<string, unknown>
     accessToken = data.access_token as string
     tokenExpiry = Date.now() + (data.expires_in as number) * 1000
+    // Spotify occasionally rotates the refresh token — save the new one if present
+    if (data.refresh_token) { refreshToken = data.refresh_token as string; saveTokens() }
   }
 
   return accessToken
@@ -266,7 +312,11 @@ app.get('/api/playlists/:id/tracks', async (req, res) => {
 
 app.listen(3001, () => {
   console.log('Spotify G2 server → http://localhost:3001')
-  if (!clientId) console.log('  No credentials yet — open the app and follow setup.')
-  else if (!accessToken) console.log('  Credentials loaded. Open /auth/login to authorize.')
-  else console.log('  Ready.')
+  if (!clientId) {
+    console.log('  No credentials yet — open the app and follow setup.')
+  } else {
+    tryRestoreSession().then(() => {
+      if (!accessToken) console.log('  Credentials loaded. Open /auth/login to authorize.')
+    })
+  }
 })

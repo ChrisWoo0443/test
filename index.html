@@ -491,6 +491,34 @@
       text-align: center; color: #b3b3b3;
       font-size: 14px; padding: 32px 20px;
     }
+
+    /* ── Toast ───────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(16px);
+      background: #282828;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      line-height: 1.4;
+      max-width: min(340px, calc(100vw - 32px));
+      text-align: center;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 200;
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+    .toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+    .toast.error { border-top: 2px solid #e05; }
+    .toast.info  { border-top: 2px solid #1db954; }
   </style>
 </head>
 <body>
@@ -702,6 +730,8 @@
   </div>
 
 </div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module" src="/src/main.ts"></script>
 <script type="module" src="/src/ui.ts"></script>
